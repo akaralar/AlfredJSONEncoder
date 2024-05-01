@@ -4,33 +4,11 @@
 
 import Foundation
 
-public struct AlfredList: Equatable, Hashable, Encodable {
-    public var items: [AlfredListItem]
-
-    public init(items: [AlfredListItem]) {
-        self.items = items
-    }
-
-    public func toJSON() throws -> String {
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = .prettyPrinted
-        if #available(macOS 10.15, *) {
-            encoder.outputFormatting.update(with: .withoutEscapingSlashes)
-        } else {
-            // TODO: Implement for macOS 10.15 and below, change string
-            // string.replacingOccurrences(of: "\\/", with: "/")
-        }
-        let data = try encoder.encode(self)
-        let string = String(data: data, encoding: .utf8)!
-        return string
-    }
-}
-
 public struct AlfredListItem: Equatable, Hashable, Encodable {
     public var uid: String?
     public var title: String
     public var subtitle: String?
-    public var arguments: OutputArguments
+    public var arguments: OutputArguments?
     public var icon: Icon?
     public var isValid: Bool?
     public var match: String?
@@ -39,7 +17,7 @@ public struct AlfredListItem: Equatable, Hashable, Encodable {
     public var modifierActions: [HeldModifiers: ModifierAction]?
     public var action: Action?
     public var text: Text?
-    public var quicklookURL: URL?
+    public var quicklookURL: String?
     public var skipKnowledge: Bool?
 
     enum CodingKeys: String, CodingKey {
@@ -64,7 +42,7 @@ public struct AlfredListItem: Equatable, Hashable, Encodable {
         try container.encodeIfPresent(self.uid, forKey: .uid)
         try container.encode(self.title, forKey: .title)
         try container.encodeIfPresent(self.subtitle, forKey: .subtitle)
-        try container.encode(self.arguments, forKey: .arguments)
+        try container.encodeIfPresent(self.arguments, forKey: .arguments)
         try container.encodeIfPresent(self.icon, forKey: .icon)
         try container.encodeIfPresent(self.isValid, forKey: .isValid)
         try container.encodeIfPresent(self.match, forKey: .match)
@@ -81,7 +59,7 @@ public struct AlfredListItem: Equatable, Hashable, Encodable {
         uid: String? = nil,
         title: String,
         subtitle: String? = nil,
-        arguments: OutputArguments,
+        arguments: OutputArguments?,
         icon: Icon? = nil,
         isValid: Bool? = nil,
         match: String? = nil,
@@ -90,7 +68,7 @@ public struct AlfredListItem: Equatable, Hashable, Encodable {
         modifierActions: [HeldModifiers : ModifierAction]? = nil,
         action: Action? = nil,
         text: Text? = nil,
-        quicklookURL: URL? = nil,
+        quicklookURL: String? = nil,
         skipKnowledge: Bool? = nil
     ) {
         self.uid = uid
@@ -118,7 +96,7 @@ public struct AlfredListItem: Equatable, Hashable, Encodable {
         isValid: true,
         match: "some match",
         autocomplete: "some autocomplete strng",
-        type: .skipCheck,
+        type: .skipFileCheck,
         modifierActions: [:],
         action: .single("some action"),
         text: Text(copy: "some copy", largeType: "some largetype"),
@@ -161,15 +139,7 @@ public enum IconType: String, Equatable, Hashable, Encodable {
 public enum ItemType: String, Equatable, Hashable, Encodable {
     case `default` = "default"
     case file
-    case skipCheck = "file:skipcheck"
-}
-
-public enum Modifier: String, Equatable, Hashable, Encodable {
-    case command = "cmd"
-    case shift
-    case option = "alt"
-    case control = "ctrl"
-    case function = "fn"
+    case skipFileCheck = "file:skipcheck"
 }
 
 public struct HeldModifiers: Equatable, Hashable, Encodable {
@@ -179,6 +149,14 @@ public struct HeldModifiers: Equatable, Hashable, Encodable {
         var container = encoder.singleValueContainer()
         try container.encode(Array(mods).map(\.rawValue).joined(separator: "+"))
     }
+}
+
+public enum Modifier: String, Equatable, Hashable, Encodable {
+    case command = "cmd"
+    case shift
+    case option = "alt"
+    case control = "ctrl"
+    case function = "fn"
 }
 
 public struct ModifierAction: Equatable, Hashable, Encodable {
@@ -200,11 +178,30 @@ public struct ModifierAction: Equatable, Hashable, Encodable {
     }
 }
 
+public enum Action: Equatable, Hashable, Encodable {
+    case single(String)
+    case multiple([String])
+    case universalAction(UniversalAction)
+
+    public func encode(to encoder: any Encoder) throws {
+        switch self {
+        case .single(let string):
+            var container = encoder.singleValueContainer()
+            try container.encode(string)
+        case .multiple(let strings):
+            var container = encoder.unkeyedContainer()
+            try container.encode(strings)
+        case .universalAction(let action):
+            try action.encode(to: encoder)
+        }
+    }
+}
+
 public enum UniversalAction: Equatable, Hashable, Encodable {
     case singleText(String)
     case multipleText([String])
     case url(URL)
-    case file(URL)
+    case file(String)
     case auto(String)
 
     enum CodingKeys: String, CodingKey {
@@ -223,29 +220,10 @@ public enum UniversalAction: Equatable, Hashable, Encodable {
             try container.encode(array, forKey: .text)
         case .url(let url):
             try container.encode(url, forKey: .url)
-        case .file(let file):
-            try container.encode(file, forKey: .file)
+        case .file(let path):
+            try container.encode(path, forKey: .file)
         case .auto(let string):
             try container.encode(string, forKey: .auto)
-        }
-    }
-}
-
-public enum Action: Equatable, Hashable, Encodable {
-    case single(String)
-    case multiple([String])
-    case universalAction(UniversalAction)
-
-    public func encode(to encoder: any Encoder) throws {
-        switch self {
-        case .single(let string):
-            var container = encoder.singleValueContainer()
-            try container.encode(string)
-        case .multiple(let strings):
-            var container = encoder.unkeyedContainer()
-            try container.encode(strings)
-        case .universalAction(let action):
-            try action.encode(to: encoder)
         }
     }
 }

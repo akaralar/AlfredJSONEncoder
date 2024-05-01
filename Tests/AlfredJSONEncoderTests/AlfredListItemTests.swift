@@ -4,7 +4,7 @@
 
 import Foundation
 import XCTest
-@testable import DirectoryLister
+@testable import AlfredJSONEncoder
 
 class AlfredListItemTests: XCTestCase {
     func testExample() {
